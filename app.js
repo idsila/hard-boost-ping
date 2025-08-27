@@ -75,7 +75,9 @@ app.post("/pay", async (req, res) => {
 });
 
 
-
+app.get("/sleep", async (req, res) => {
+  res.send({ type: 200 });
+});
 
 app.listen(3001, (err) => {
   err ? err : console.log("STARTED SERVER"); 
