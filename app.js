@@ -25,7 +25,8 @@ let boosts = services.filter((item) => item.category === "Telegram Boost");
 let stars = services.filter((item) => item.category === "Telegram Stars");
 
 axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => { 
-  services = res.data; 
+  services = res.data;
+  services.forEach(item => item.rate = item.rate*1.5 ) 
   followers = services.filter((item) => item.category === "Telegram");
   views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
   reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
@@ -66,7 +67,7 @@ function updateOrders() {
             );
             orderBase.updateOne({ id: item.id }, { $set: { completed: true } });
           } else if (status == "Completed") {
-            //axios.post(`${URL_BOT}/send-user`, {id: item.customer, msg:`<b>🎉 Ваш заказ был выполнен #${item.id}</b>`}, {  headers: { 'Content-Type':'application/json' } })
+            axios.post(`${URL_BOT}/send-user`, {id: item.customer, msg:`<b>🎉 Ваш заказ был полностью выполнен #${item.id}</b>`}, {  headers: { 'Content-Type':'application/json' } })
             orderBase.updateOne({ id: item.id }, { $set: { completed: true } });
           } else if (status == "Canceled") {
             axios.post(
@@ -91,10 +92,10 @@ function updateOrders() {
     });
   });
 }
-
+updateOrders()
 setInterval(() => {
   updateOrders();
-}, 1000*60*60);
+}, 1000*60*30);
 
 
 app.post("/pay", async (req, res) => {
@@ -161,7 +162,7 @@ app.post('/app', async (req, res) => {
 
 app.post('/my-orders', async (req, res) => {
   const { id } =  req.body
-  orderBase.find({ customer: id }).then(orders => {
+  orderBase.find({ customer: id, completed: false }).then(orders => {
     if(orders){
       res.send({ orders, services});
     }
@@ -188,8 +189,12 @@ app.post('/create-order', async (req, res) => {
  
       if (url.includes("https://t.me/") && currentPay <= user.balance &&
       currentService.min <= amount && currentService.max >= amount) {
-        orderBase
-          .insertOne({
+        
+          
+          axios(`https://optsmm.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${OPTSMM_KEY}`)
+          .then(optsmm => { 
+            dataBase.updateOne({ id: id }, { $inc : { balance: -currentPay }});
+            orderBase.insertOne({
               id: idOrder,
               customer: id,
               service: service,
@@ -197,12 +202,53 @@ app.post('/create-order', async (req, res) => {
               price: currentPay,
               url: url,
               ready: true,
-              completed: false
-          })
+              completed: false,
+              order: optsmm.data.order
+            });
+          });
+          res.send({ type: 'create', msg: 'Успешно создан'});
+      }
+      else{
+        res.send({ type: 'rmv', msg: 'Непрошли проверку'});
+      }
+    }
+    else{
+      res.send({ type: 'rmv', msg: 'Аккаунт не найден'});
+    }
+    
+  })
+});
+app.post('/create-order-boost', async (req, res) => {
+  const { id, url, amount, pay, service   } =  req.body
+  console.log(req.body)
+  dataBase.findOne({ id }).then(user => {
+    if(user){
+      const currentService = services.filter((item) => item.service === service)[0];
+      const currentPay = (currentService.rate)*amount;
+      const idOrder = refCode();
+      console.log(url.includes("https://t.me/"), currentPay <= user.balance ,
+      currentService.min <= amount, currentService.max >= amount);
+ 
+      if (url.includes("https://t.me/") && currentPay <= user.balance &&
+      currentService.min <= amount && currentService.max >= amount) {
+        
           
-          //axios(`https://optsmm.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${OPTSMM_KEY}`)
-           // .then(optsmm => { });
-          res.send({ type: 'create', msg: 'Успешно'});
+          axios(`https://optsmm.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${OPTSMM_KEY}`)
+          .then(optsmm => { 
+            dataBase.updateOne({ id: id }, { $inc : { balance: -currentPay }});
+            orderBase.insertOne({
+              id: idOrder,
+              customer: id,
+              service: service,
+              amount: amount,
+              price: currentPay,
+              url: url,
+              ready: true,
+              completed: false,
+              order: optsmm.data.order
+            });
+          });
+          res.send({ type: 'create', msg: 'Успешно создан'});
       }
       else{
         res.send({ type: 'rmv', msg: 'Непрошли проверку'});
