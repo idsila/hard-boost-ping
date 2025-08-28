@@ -92,7 +92,7 @@ function updateOrders() {
 
 setInterval(() => {
   updateOrders();
-}, 1000*60);
+}, 1000*60*60);
 
 
 app.post("/pay", async (req, res) => {
