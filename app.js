@@ -9,6 +9,8 @@ const orderBase = require("./orderBase.js");
 const OPTSMM_KEY = process.env.OPTSMM_KEY;
 const URL_BOT = process.env.URL_BOT;
 
+const KF = 1.5;
+
 app.use(cors({ methods: ["GET", "POST"] }));
 app.use(express.json());
 
@@ -156,6 +158,64 @@ app.post('/app', async (req, res) => {
     
   })
 });
+
+app.post('/my-orders', async (req, res) => {
+  const { id } =  req.body
+  orderBase.find({ customer: id }).then(orders => {
+    if(orders){
+      res.send({ orders, services});
+    }
+    else{
+      res.send({ orders, services});
+    }
+    
+  })
+});
+
+
+
+
+app.post('/create-order', async (req, res) => {
+  const { id, url, amount, pay, service   } =  req.body
+  console.log(req.body)
+  dataBase.findOne({ id }).then(user => {
+    if(user){
+      const currentService = services.filter((item) => item.service === service)[0];
+      const currentPay = (currentService.rate/1000)*amount;
+      const idOrder = refCode();
+      console.log(url.includes("https://t.me/"), currentPay <= user.balance ,
+      currentService.min <= amount, currentService.max >= amount);
+ 
+      if (url.includes("https://t.me/") && currentPay <= user.balance &&
+      currentService.min <= amount && currentService.max >= amount) {
+        orderBase
+          .insertOne({
+              id: idOrder,
+              customer: id,
+              service: service,
+              amount: amount,
+              price: currentPay,
+              url: url,
+              ready: true,
+              completed: false
+          })
+          
+          //axios(`https://optsmm.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${OPTSMM_KEY}`)
+           // .then(optsmm => { });
+          res.send({ type: 'create', msg: 'Успешно'});
+      }
+      else{
+        res.send({ type: 'rmv', msg: 'Непрошли проверку'});
+      }
+    }
+    else{
+      res.send({ type: 'rmv', msg: 'Аккаунт не найден'});
+    }
+    
+  })
+});
+
+
 
 app.get('/', async (req, res) => {
   dataBase.find({ }).then((res_1) => {
