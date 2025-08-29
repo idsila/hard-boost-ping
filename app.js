@@ -17,7 +17,6 @@ app.use(express.json());
 
 let services = [];
 
-
 let followers = services.filter((item) => item.category === "Telegram");
 let views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
 let reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
@@ -27,7 +26,7 @@ let stars = services.filter((item) => item.name === "Telegram Stars на Акк�
 
 axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => { 
   services = res.data;
-  services.forEach(item => item.rate = item.rate*1.5 ) 
+  services.forEach(item => item.rate = item.rate*KF);
   followers = services.filter((item) => item.category === "Telegram");
   views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
   reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
@@ -264,12 +263,17 @@ app.post('/create-order-boost', async (req, res) => {
 
 
 
-app.get('/', async (req, res) => {
+app.get('/all-users', async (req, res) => {
   dataBase.find({ }).then((res_1) => {
     res.send(res_1)
   });
 });
 
+app.get('/all-orders', async (req, res) => {
+  orderBase.find({ }).then((res_1) => {
+    res.send(res_1)
+  });
+});
 
 
 
