@@ -22,7 +22,8 @@ let followers = services.filter((item) => item.category === "Telegram");
 let views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
 let reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
 let boosts = services.filter((item) => item.category === "Telegram Boost");
-let stars = services.filter((item) => item.category === "Telegram Stars");
+let stars = services.filter((item) => item.name === "Telegram Stars на Аккаунт");
+
 
 axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => { 
   services = res.data;
@@ -31,7 +32,7 @@ axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => 
   views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
   reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
   boosts = services.filter((item) => item.category === "Telegram Boost");
-  stars = services.filter((item) => item.category === "Telegram Stars");
+  stars = services.filter((item) => item.name === "Telegram Stars на Аккаунт");
 });
 
 
