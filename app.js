@@ -38,11 +38,13 @@ axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => 
 
 
 
-
+// orderBase.find({ completed: false }).then((res) => { 
+//   console.log(res)
+// })
 
 
 function updateOrders() {
-  orderBase.find({ completed: false }).then((res) => {
+  orderBase.find({ completed: false, ready:true }).then((res) => {
     res.forEach((item) => {
       axios(
         `https://optsmm.ru/api/v2?action=status&order=${item.order}&key=${OPTSMM_KEY}`
