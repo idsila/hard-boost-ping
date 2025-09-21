@@ -17,22 +17,30 @@ app.use(express.json());
 
 let services = [];
 
-let followers = services.filter((item) => item.category === "Telegram");
+let followers = services.filter((item) => item.name.includes("одписчики") && item.category === "Telegram");
 let views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
 let reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
 let boosts = services.filter((item) => item.category === "Telegram Boost");
 let stars = services.filter((item) => item.name === "Telegram Stars на Аккаунт");
 
 
-axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => { 
-  services = res.data;
-  services.forEach(item => item.rate = item.rate*KF);
-  followers = services.filter((item) => item.category === "Telegram");
-  views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
-  reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
-  boosts = services.filter((item) => item.category === "Telegram Boost");
-  stars = services.filter((item) => item.name === "Telegram Stars на Аккаунт");
+function getNewService(){
+  axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => { 
+  obj = res.data;
+  obj.forEach(item => item.rate = item.rate*KF);
+  followers = obj.filter((item) => item.name.includes("одписчики") && item.category === "Telegram");
+  views = obj.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
+  reactions = obj.filter( (item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
+  boosts = obj.filter((item) => item.category === "Telegram Boost");
+  stars = obj.filter((item) => item.name === "Telegram Stars на Аккаунт");
 });
+}
+
+
+getNewService();
+
+setInterval(getNewService,(1000*60*60)*60 );
+
 
 
 
