@@ -6,6 +6,9 @@ const app = express();
 
 const dataBase = require("./dataBase.js");
 const orderBase = require("./orderBase.js");
+
+const TOKEN_VEXBOOST= process.env.TOKEN_VEXBOOST; 
+
 const OPTSMM_KEY = process.env.OPTSMM_KEY;
 const URL_BOT = process.env.URL_BOT;
 
@@ -17,22 +20,20 @@ app.use(express.json());
 
 let services = [];
 
-let followers = services.filter((item) => item.name.includes("одписчики") && item.category === "Telegram");
-let views = services.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
-let reactions = services.filter((item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
-let boosts = services.filter((item) => item.category === "Telegram Boost");
-let stars = services.filter((item) => item.name === "Telegram Stars на Аккаунт");
-
-
+let followers, views, reactions, boosts, stars, referrals = [];
+ 
 function getNewService(){
-  axios(`https://optsmm.ru/api/v2?action=services&key=${OPTSMM_KEY}`).then(res => { 
-  obj = res.data;
+  axios(`https://vexboost.ru/api/v2?action=services&key=${TOKEN_VEXBOOST}`).then(res => { 
+
+  obj = JSON.parse(JSON.stringify(res.data).replaceAll('vexboost', 'hardboost').replaceAll('VexBoost', 'HardBoost').replaceAll('.ru', '.vercel.app'));
+
   obj.forEach(item => item.rate = item.rate*KF);
-  followers = obj.filter((item) => item.name.includes("одписчики") && item.category === "Telegram");
-  views = obj.filter((item) => item.name.includes("росмотр") && item.category === "Telegram реакции/просмотры");
-  reactions = obj.filter( (item) => item.name.includes("еакци") && item.category === "Telegram реакции/просмотры");
-  boosts = obj.filter((item) => item.category === "Telegram Boost");
-  stars = obj.filter((item) => item.name === "Telegram Stars на Аккаунт");
+  followers = obj.filter((item) => item.name.includes("одписчик") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+  views = obj.filter((item) => item.name.includes("росмотр") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+  reactions = obj.filter( (item) => item.name.includes("еакци") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+  boosts = obj.filter((item) => item.name.includes("Telegram Буст") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+  stars = obj.filter((item) => item.name.includes("Telegram Stars")).sort((a,b) => a.rate - b.rate);
+  referrals = obj.filter((item) => (item.category.includes("Старты бота") || item.category.includes("Рефералы"))).sort((a,b) => a.rate - b.rate);  
 });
 }
 
@@ -200,8 +201,8 @@ app.post('/create-order', async (req, res) => {
       if (url.includes("https://t.me/") && currentPay <= user.balance &&
       currentService.min <= amount && currentService.max >= amount) {
         
-          
-          axios(`https://optsmm.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${OPTSMM_KEY}`)
+      
+          axios(`https://vexboost.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${TOKEN_VEXBOOST}`)
           .then(optsmm => { 
             dataBase.updateOne({ id: id }, { $inc : { balance: -currentPay }});
             orderBase.insertOne({
@@ -243,7 +244,7 @@ app.post('/create-order-boost', async (req, res) => {
       currentService.min <= amount && currentService.max >= amount) {
         
           
-          axios(`https://optsmm.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${OPTSMM_KEY}`)
+          axios(`https://vexboost.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${TOKEN_VEXBOOST}`)
           .then(optsmm => { 
             dataBase.updateOne({ id: id }, { $inc : { balance: -currentPay }});
             orderBase.insertOne({
@@ -307,6 +308,11 @@ app.post('/boosts', async (req, res) => {
 app.post('/stars', async (req, res) => {
   res.send(stars);
 });
+
+app.post('/referrals', async (req, res) => {
+  res.send(referrals);
+});
+
 
 
 function refCode(n = 6) {
