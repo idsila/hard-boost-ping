@@ -148,7 +148,7 @@ app.post('/app', async (req, res) => {
   const { first_name, username, id, language_code } =  req.body
   dataBase.findOne({ id }).then(user => {
     if(user){
-      res.send(user);
+      res.send({ user, services: { followers, views, reactions, boosts, stars, referrals }});
     }
     else{
       const createUser = {
@@ -164,7 +164,7 @@ app.post('/app', async (req, res) => {
         balance: 0,
       }
       dataBase.insertOne(createUser);
-      res.send(createUser);
+      res.send({ user: createUser, services: { followers, views, reactions, boosts, stars, referrals }});
       console.log('CREATE USER')
     }
     
@@ -312,6 +312,8 @@ app.post('/stars', async (req, res) => {
 app.post('/referrals', async (req, res) => {
   res.send(referrals);
 });
+
+
 
 
 
