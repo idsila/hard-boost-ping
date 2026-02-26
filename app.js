@@ -51,12 +51,26 @@ setInterval(getNewService,(1000*60*60)*60 );
 //   console.log(res)
 // })
 
+function updateOrdersConnect(id) {
+  console.log('updateOrdersConnect');
+  orderBase.find({ customer: id, completed: false, ready:true }).then((res) => {
+    res.forEach((item) => {
+      axios(`https://vexboost.ru/api/v2?action=status&order=${item.order}&key=${TOKEN_VEXBOOST}`).then((order) => {  
+        console.log(item);
+      });
+    });
+  });
+}
+
+
 
 function updateOrders() {
   orderBase.find({ completed: false, ready:true }).then((res) => {
     res.forEach((item) => {
+      // https://vexboost.ru/api/v2?action=services&key=${TOKEN_VEXBOOST}
+      // https://optsmm.ru/api/v2?action=status&order=${item.order}&key=${OPTSMM_KEY}
       axios(
-        `https://optsmm.ru/api/v2?action=status&order=${item.order}&key=${OPTSMM_KEY}`
+        `https://vexboost.ru/api/v2?action=status&order=${item.order}&key=${TOKEN_VEXBOOST}`
       ).then((order) => {
         const { status } = order.data;
         if (status != "In progress" && status != "Awaiting") {
@@ -103,9 +117,9 @@ function updateOrders() {
     });
   });
 }
-updateOrders()
+//updateOrders()
 setInterval(() => {
-  updateOrders();
+  //updateOrders();
 }, 1000*60*10);
 
 
@@ -173,7 +187,8 @@ app.post('/app', async (req, res) => {
 
 app.post('/my-orders', async (req, res) => {
   const { id } =  req.body
-  orderBase.find({ customer: id, completed: false }).then(orders => {
+  orderBase.find({ customer: id }).then(orders => {
+    updateOrdersConnect(id);
     if(orders){
       res.send({ orders, services});
     }

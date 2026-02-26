@@ -5,7 +5,7 @@ const uri = process.env.URI;
 const client = new MongoClient(uri);
 
 const db =  client.db('test');
-const users =  db.collection('orders_hard_boost_bot');
+const users =  db.collection('orders_service');
 
 async function clearCollection() {
   try {
