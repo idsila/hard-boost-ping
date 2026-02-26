@@ -23,18 +23,18 @@ let services = [];
 let followers, views, reactions, boosts, stars, referrals = [];
  
 function getNewService(){
-  axios(`https://vexboost.ru/api/v2?action=services&key=${TOKEN_VEXBOOST}`).then(res => { 
+  axios(`https://vexboost.ru/api/v2?action=services&key=${TOKEN_VEXBOOST}`).then(res => {
+    services = res.data;
+    obj = JSON.parse(JSON.stringify(res.data).replaceAll('vexboost', 'hardboost').replaceAll('VexBoost', 'HardBoost').replaceAll('.ru', '.vercel.app'));
 
-  obj = JSON.parse(JSON.stringify(res.data).replaceAll('vexboost', 'hardboost').replaceAll('VexBoost', 'HardBoost').replaceAll('.ru', '.vercel.app'));
-
-  obj.forEach(item => item.rate = item.rate*KF);
-  followers = obj.filter((item) => item.name.includes("одписчик") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
-  views = obj.filter((item) => item.name.includes("росмотр") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
-  reactions = obj.filter( (item) => item.name.includes("еакци") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
-  boosts = obj.filter((item) => item.name.includes("Telegram Буст") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
-  stars = obj.filter((item) => item.name.includes("Telegram Stars")).sort((a,b) => a.rate - b.rate);
-  referrals = obj.filter((item) => (item.category.includes("Старты бота") || item.category.includes("Рефералы"))).sort((a,b) => a.rate - b.rate);  
-});
+    obj.forEach(item => item.rate = item.rate*KF);
+    followers = obj.filter((item) => item.name.includes("одписчик") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+    views = obj.filter((item) => item.name.includes("росмотр") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+    reactions = obj.filter( (item) => item.name.includes("еакци") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+    boosts = obj.filter((item) => item.name.includes("Telegram Буст") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
+    stars = obj.filter((item) => item.name.includes("Telegram Stars")).sort((a,b) => a.rate - b.rate);
+    referrals = obj.filter((item) => (item.category.includes("Старты бота") || item.category.includes("Рефералы"))).sort((a,b) => a.rate - b.rate);  
+  });
 }
 
 
@@ -188,12 +188,13 @@ app.post('/my-orders', async (req, res) => {
 
 
 app.post('/create-order', async (req, res) => {
-  const { id, url, amount, pay, service   } =  req.body
-  console.log(req.body)
+  const { id, url, amount, pay, service } =  req.body
+  console.log(req.body);
   dataBase.findOne({ id }).then(user => {
     if(user){
       const currentService = services.filter((item) => item.service === service)[0];
       const currentPay = (currentService.rate/1000)*amount;
+      
       const idOrder = refCode();
       console.log(url.includes("https://t.me/"), currentPay <= user.balance ,
       currentService.min <= amount, currentService.max >= amount);
@@ -231,7 +232,7 @@ app.post('/create-order', async (req, res) => {
 });
 app.post('/create-order-boost', async (req, res) => {
   const { id, url, amount, pay, service   } =  req.body
-  console.log(req.body)
+  console.log( req.body)
   dataBase.findOne({ id }).then(user => {
     if(user){
       const currentService = services.filter((item) => item.service === service)[0];
