@@ -1,4 +1,5 @@
 require("dotenv").config();
+const crypto = require('crypto');
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
@@ -10,6 +11,7 @@ const orderBase = require("./orderBase.js");
 const TOKEN_VEXBOOST= process.env.TOKEN_VEXBOOST; 
 
 const OPTSMM_KEY = process.env.OPTSMM_KEY;
+const BOT_TOKEN = process.env.BOT_TOKEN;
 const URL_BOT = process.env.URL_BOT;
 
 const KF = 1.5;
@@ -17,6 +19,9 @@ const KF = 1.5;
 app.use(cors({ methods: ["GET", "POST"] }));
 app.use(express.json());
 
+
+
+const AUTH_KEYS = [];
 
 let services = [];
 
@@ -158,71 +163,76 @@ app.get("/sleep", async (req, res) => {
 });
 
 
-app.post('/app', async (req, res) => {
-  const { first_name, username, id, language_code } =  req.body
-  dataBase.findOne({ id }).then(user => {
-    if(user){
-      res.send({ user, services: { followers, views, reactions, boosts, stars, referrals }});
-    }
-    else{
-      const createUser = {
-        id,
-        first_name,
-        username,
-        language_code,
-        referrals: 0,
-        bonus: true,
-        ref_code: refCode(),
-        prefer: 0,
-        date: dateNow(),
-        balance: 0,
+app.post('/api/auth', async (req, res) => {
+  const { initData = null } =  req.body;
+  const answer = await verifyTelegramInitData(initData);
+
+  if(answer.isVerify){
+    const { first_name, username, id, language_code } = answer.user;
+    dataBase.findOne({ id }).then(user => {
+      if(user){
+        res.send({ user, services: { followers, views, reactions, boosts, stars, referrals }});
       }
-      dataBase.insertOne(createUser);
-      res.send({ user: createUser, services: { followers, views, reactions, boosts, stars, referrals }});
-      console.log('CREATE USER')
-    }
-    
-  })
+      else{
+        const createUser = {
+          id,
+          first_name,
+          username,
+          language_code,
+          referrals: 0,
+          bonus: true,
+          ref_code: refCode(),
+          prefer: 0,
+          date: dateNow(),
+          balance: 0,
+        }
+        dataBase.insertOne(createUser);
+        res.send({ user: createUser, services: { followers, views, reactions, boosts, stars, referrals }});
+      }  
+    })
+  }
+  else{
+    res.status(401).send({ msg: 'Ошибка авторизации!'})
+  }
 });
 
-app.post('/my-orders', async (req, res) => {
-  const { id } =  req.body
-  orderBase.find({ customer: id }).then(orders => {
-    updateOrdersConnect(id);
-    if(orders){
+app.post('/api/my-orders', async (req, res) => {
+  const { initData = null } =  req.body
+  const answer = await verifyTelegramInitData(initData);
+
+  if(answer.isVerify){
+    const { id } = answer.user;
+    orderBase.find({ customer: id }).then(orders => {
+      updateOrdersConnect(id);
       res.send({ orders, services});
-    }
-    else{
-      res.send({ orders, services});
-    }
-    
-  })
+    });
+  }
+  else{
+    res.status(401).send({ msg: 'Ошибка авторизации!'})
+  }
 });
 
 
 
+// https://t.me/trustvpn_official_bot?start=R1768954217963
 
-app.post('/create-order', async (req, res) => {
-  const { id, url, amount, pay, service } =  req.body
-  console.log(req.body);
-  dataBase.findOne({ id }).then(user => {
-    if(user){
-      const currentService = services.filter((item) => item.service === service)[0];
-      const currentPay = (currentService.rate/1000)*amount;
-      
-      const idOrder = refCode();
-      console.log(url.includes("https://t.me/"), currentPay <= user.balance ,
-      currentService.min <= amount, currentService.max >= amount);
+app.post('/api/create-order', async (req, res) => {
+  const { initData = null, url, amount, pay, service } =  req.body
+  const answer = await verifyTelegramInitData(initData);
+
+
+  if(answer.isVerify){
+    const { id } = answer.user;
+    dataBase.findOne({ id }).then(user => {
+      if(user){
+        const currentService = services.filter((item) => item.service === service)[0];
+        const currentPay = (currentService.rate/1000)*amount;
  
-      if (url.includes("https://t.me/") && currentPay <= user.balance &&
-      currentService.min <= amount && currentService.max >= amount) {
-        
-      
-          axios(`https://vexboost.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${TOKEN_VEXBOOST}`)
-          .then(optsmm => { 
+        if (currentPay <= user.balance && currentService.min <= amount && currentService.max >= amount) {  
+          axios(`https://vexboost.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${TOKEN_VEXBOOST}`).then(order => { 
             dataBase.updateOne({ id: id }, { $inc : { balance: -currentPay }});
             orderBase.insertOne({
-              id: idOrder,
+              id: refCode(),
               customer: id,
               service: service,
               amount: amount,
@@ -230,20 +240,26 @@ app.post('/create-order', async (req, res) => {
               url: url,
               ready: true,
               completed: false,
-              order: optsmm.data.order
+              order: order.data.order
             });
           });
           res.send({ type: 'create', msg: 'Успешно создан'});
+        }
+        else{
+          res.send({ type: 'rmv', msg: 'Непрошли проверку'});
+        }
       }
-      else{
-        res.send({ type: 'rmv', msg: 'Непрошли проверку'});
-      }
-    }
     else{
       res.send({ type: 'rmv', msg: 'Аккаунт не найден'});
     }
     
   })
+  }
+  else{
+    res.status(401).send({ msg: 'Ошибка авторизации!'})
+  }
+
+ 
 });
 app.post('/create-order-boost', async (req, res) => {
   const { id, url, amount, pay, service   } =  req.body
@@ -305,37 +321,36 @@ app.get('/all-orders', async (req, res) => {
 
 
 
-app.post('/followers', async (req, res) => {
-  res.send(followers);
-});
+// app.post('/followers', async (req, res) => {
+//   res.send(followers);
+// });
 
-app.post('/views', async (req, res) => {
-  res.send(views);
-});
+// app.post('/views', async (req, res) => {
+//   res.send(views);
+// });
 
-app.post('/reactions', async (req, res) => {
-  res.send(reactions);
-});
+// app.post('/reactions', async (req, res) => {
+//   res.send(reactions);
+// });
 
-app.post('/boosts', async (req, res) => {
-  res.send(boosts);
-});
+// app.post('/boosts', async (req, res) => {
+//   res.send(boosts);
+// });
 
-app.post('/stars', async (req, res) => {
-  res.send(stars);
-});
+// app.post('/stars', async (req, res) => {
+//   res.send(stars);
+// });
 
-app.post('/referrals', async (req, res) => {
-  res.send(referrals);
-});
+// app.post('/referrals', async (req, res) => {
+//   res.send(referrals);
+// });
 
 
 
 
 
 function refCode(n = 6) {
-  const symbols =
-    "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890";
+  const symbols = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890";
   let user_hash = "";
   for (let i = 0; i != n; i++) {
     user_hash += symbols[Math.floor(Math.random() * symbols.length)];
@@ -345,6 +360,16 @@ function refCode(n = 6) {
 
 function dateNow() {
   return new Date().getTime();
+}
+async function verifyTelegramInitData(initData) {
+  const urlParams = new URLSearchParams(initData);
+  const hash = urlParams.get("hash");
+  urlParams.delete("hash");
+  const user = JSON.parse(urlParams.get("user"));
+  const dataCheckString = Array.from(urlParams.entries()).map(([k, v]) => `${k}=${v}`).sort().join("\n");
+  const secretKey = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+  const hmac = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+  return { isVerify: hmac === hash, user } ;
 }
 
 app.listen(3001, (err) => {
