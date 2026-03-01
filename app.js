@@ -18,10 +18,10 @@ app.use(cors({ methods: ["GET", "POST"] }));
 app.use(express.json());
 
 
+const SERVICES = [ { name: 'Подписчики', type:'followers',  icon: 'assets/followers.svg', targetFunc: 'orderFollowers', amount: 1000 }, { name: 'Просмотры', type:'views', icon: 'assets/views.svg', targetFunc: 'orderViews', amount: 1000 }, { name: 'Реакции', type: 'reactions', icon: 'assets/reactions.svg', targetFunc: 'orderReactions', amount: 1000 }, { name: 'Буст канала', type: 'boosts', icon: 'assets/boost.png', targetFunc: 'orderBoosts', amount: 1 }, { name: 'Звезды', type: 'stars', icon: 'assets/stars.png', targetFunc: 'orderStars', amount: 1000 }, { name: 'Рефералы', type:'referrals', icon: 'assets/referral.svg', targetFunc: 'orderReferrals', amount: 1000 } ]; 
 
 
 let services = [];
-
 let followers, views, reactions, boosts, stars, referrals = [];
  
 function getNewService(){
@@ -330,8 +330,6 @@ async function verifyTelegramInitData(initData) {
   const hmac = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
   return { isVerify: hmac === hash, user } ;
 }
-
-const SERVICES = [ { name: 'Подписчики', type:'followers',  icon: 'assets/followers.svg', targetFunc: 'orderFollowers', amount: 1000 }, { name: 'Просмотры', type:'views', icon: 'assets/views.svg', targetFunc: 'orderViews', amount: 1000 }, { name: 'Реакции', type: 'reactions', icon: 'assets/reactions.svg', targetFunc: 'orderReactions', amount: 1000 }, { name: 'Буст канала', type: 'boosts', icon: 'assets/boost.png', targetFunc: 'orderBoosts', amount: 1 }, { name: 'Звезды', type: 'stars', icon: 'assets/stars.png', targetFunc: 'orderStars', amount: 1000 }, { name: 'Рефералы', type:'referrals', icon: 'assets/referral.svg', targetFunc: 'orderReferrals', amount: 1000 } ]; 
 
 function typeOrder(service){
   for(const key in stateApp.services){
