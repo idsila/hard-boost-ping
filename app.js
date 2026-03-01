@@ -217,13 +217,15 @@ app.post('/api/create-order', async (req, res) => {
   const { initData = null, url, amount, pay, service } =  req.body
   const answer = await verifyTelegramInitData(initData);
 
+  const type = typeOrder(service);
+
 
   if(answer.isVerify){
     const { id } = answer.user;
     dataBase.findOne({ id }).then(user => {
       if(user){
         const currentService = services.filter((item) => item.service === service)[0];
-        const currentPay = (currentService.rate/1000)*amount;
+        const currentPay = (currentService.rate/type.amount)*amount;
  
         if (currentPay <= user.balance && currentService.min <= amount && currentService.max >= amount) {  
           axios(`https://vexboost.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${TOKEN_VEXBOOST}`).then(order => { 
@@ -259,48 +261,7 @@ app.post('/api/create-order', async (req, res) => {
 
  
 });
-app.post('/create-order-boost', async (req, res) => {
-  const { id, url, amount, pay, service   } =  req.body
-  console.log( req.body)
-  dataBase.findOne({ id }).then(user => {
-    if(user){
-      const currentService = services.filter((item) => item.service === service)[0];
-      const currentPay = (currentService.rate)*amount;
-      const idOrder = refCode();
-      console.log(url.includes("https://t.me/"), currentPay <= user.balance ,
-      currentService.min <= amount, currentService.max >= amount);
- 
-      if (url.includes("https://t.me/") && currentPay <= user.balance &&
-      currentService.min <= amount && currentService.max >= amount) {
-        
-          
-          axios(`https://vexboost.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${TOKEN_VEXBOOST}`)
-          .then(optsmm => { 
-            dataBase.updateOne({ id: id }, { $inc : { balance: -currentPay }});
-            orderBase.insertOne({
-              id: idOrder,
-              customer: id,
-              service: service,
-              amount: amount,
-              price: currentPay,
-              url: url,
-              ready: true,
-              completed: false,
-              order: optsmm.data.order
-            });
-          });
-          res.send({ type: 'create', msg: 'Успешно создан'});
-      }
-      else{
-        res.send({ type: 'rmv', msg: 'Непрошли проверку'});
-      }
-    }
-    else{
-      res.send({ type: 'rmv', msg: 'Аккаунт не найден'});
-    }
-    
-  })
-});
+
 
 
 
@@ -369,6 +330,20 @@ async function verifyTelegramInitData(initData) {
   const hmac = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
   return { isVerify: hmac === hash, user } ;
 }
+
+const SERVICES = [ { name: 'Подписчики', type:'followers',  icon: 'assets/followers.svg', targetFunc: 'orderFollowers', amount: 1000 }, { name: 'Просмотры', type:'views', icon: 'assets/views.svg', targetFunc: 'orderViews', amount: 1000 }, { name: 'Реакции', type: 'reactions', icon: 'assets/reactions.svg', targetFunc: 'orderReactions', amount: 1000 }, { name: 'Буст канала', type: 'boosts', icon: 'assets/boost.png', targetFunc: 'orderBoosts', amount: 1 }, { name: 'Звезды', type: 'stars', icon: 'assets/stars.png', targetFunc: 'orderStars', amount: 1000 }, { name: 'Рефералы', type:'referrals', icon: 'assets/referral.svg', targetFunc: 'orderReferrals', amount: 1000 } ]; 
+
+function typeOrder(service){
+  for(const key in stateApp.services){
+    if(stateApp.services.hasOwnProperty(key)){
+      const arr = stateApp.services[key].filter(item => item.service === service);
+      if(arr.length != 0){
+        return SERVICES.find(item => item.type === key);
+      }
+    }
+  }
+}
+
 
 app.listen(3001, (err) => {
   err ? err : console.log("STARTED SERVER");
