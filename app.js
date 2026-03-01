@@ -9,8 +9,6 @@ const dataBase = require("./dataBase.js");
 const orderBase = require("./orderBase.js");
 
 const TOKEN_VEXBOOST= process.env.TOKEN_VEXBOOST; 
-
-const OPTSMM_KEY = process.env.OPTSMM_KEY;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const URL_BOT = process.env.URL_BOT;
 
@@ -21,7 +19,6 @@ app.use(express.json());
 
 
 
-const AUTH_KEYS = [];
 
 let services = [];
 
@@ -240,7 +237,8 @@ app.post('/api/create-order', async (req, res) => {
               url: url,
               ready: true,
               completed: false,
-              order: order.data.order
+              order: order.data.order,
+              date: dateNow()
             });
           });
           res.send({ type: 'create', msg: 'Успешно создан'});
