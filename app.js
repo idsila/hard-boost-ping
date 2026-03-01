@@ -18,10 +18,11 @@ app.use(cors({ methods: ["GET", "POST"] }));
 app.use(express.json());
 
 
-const SERVICES = [ { name: 'Подписчики', type:'followers',  icon: 'assets/followers.svg', targetFunc: 'orderFollowers', amount: 1000 }, { name: 'Просмотры', type:'views', icon: 'assets/views.svg', targetFunc: 'orderViews', amount: 1000 }, { name: 'Реакции', type: 'reactions', icon: 'assets/reactions.svg', targetFunc: 'orderReactions', amount: 1000 }, { name: 'Буст канала', type: 'boosts', icon: 'assets/boost.png', targetFunc: 'orderBoosts', amount: 1 }, { name: 'Звезды', type: 'stars', icon: 'assets/stars.png', targetFunc: 'orderStars', amount: 1000 }, { name: 'Рефералы', type:'referrals', icon: 'assets/referral.svg', targetFunc: 'orderReferrals', amount: 1000 } ]; 
+const SERVICES_TYPE = [ { name: 'Подписчики', type:'followers',  icon: 'assets/followers.svg', targetFunc: 'orderFollowers', amount: 1000 }, { name: 'Просмотры', type:'views', icon: 'assets/views.svg', targetFunc: 'orderViews', amount: 1000 }, { name: 'Реакции', type: 'reactions', icon: 'assets/reactions.svg', targetFunc: 'orderReactions', amount: 1000 }, { name: 'Буст канала', type: 'boosts', icon: 'assets/boost.png', targetFunc: 'orderBoosts', amount: 1 }, { name: 'Звезды', type: 'stars', icon: 'assets/stars.png', targetFunc: 'orderStars', amount: 1000 }, { name: 'Рефералы', type:'referrals', icon: 'assets/referral.svg', targetFunc: 'orderReferrals', amount: 1000 } ]; 
 
 
 let services = [];
+let all_services = {};
 let followers, views, reactions, boosts, stars, referrals = [];
  
 function getNewService(){
@@ -36,6 +37,8 @@ function getNewService(){
     boosts = obj.filter((item) => item.name.includes("Telegram Буст") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
     stars = obj.filter((item) => item.name.includes("Telegram Stars")).sort((a,b) => a.rate - b.rate);
     referrals = obj.filter((item) => (item.category.includes("Старты бота") || item.category.includes("Рефералы"))).sort((a,b) => a.rate - b.rate);  
+
+    all_services = { followers, views, reactions, boosts, stars, referrals } ;
   });
 }
 
@@ -168,7 +171,7 @@ app.post('/api/auth', async (req, res) => {
     const { first_name, username, id, language_code } = answer.user;
     dataBase.findOne({ id }).then(user => {
       if(user){
-        res.send({ user, services: { followers, views, reactions, boosts, stars, referrals }});
+        res.send({ user, services: all_services});
       }
       else{
         const createUser = {
@@ -184,7 +187,7 @@ app.post('/api/auth', async (req, res) => {
           balance: 0,
         }
         dataBase.insertOne(createUser);
-        res.send({ user: createUser, services: { followers, views, reactions, boosts, stars, referrals }});
+        res.send({ user: createUser, services: all_services });
       }  
     })
   }
@@ -218,6 +221,8 @@ app.post('/api/create-order', async (req, res) => {
   const answer = await verifyTelegramInitData(initData);
 
   const type = typeOrder(service);
+
+    console.log(type, service);
 
 
   if(answer.isVerify){
@@ -332,11 +337,12 @@ async function verifyTelegramInitData(initData) {
 }
 
 function typeOrder(service){
-  for(const key in stateApp.services){
-    if(stateApp.services.hasOwnProperty(key)){
-      const arr = stateApp.services[key].filter(item => item.service === service);
+  console.log(service);
+  for(const key in all_services){
+    if(all_services.hasOwnProperty(key)){
+      const arr = all_services[key].filter(item => item.service === service);
       if(arr.length != 0){
-        return SERVICES.find(item => item.type === key);
+        return SERVICES_TYPE.find(item => item.type === key);
       }
     }
   }
