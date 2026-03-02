@@ -5,9 +5,15 @@ const axios = require("axios");
 const cors = require("cors");
 const app = express();
 const fs = require("fs");
+const DB = require("./connectDB.js");
 
-const dataBase = require("./dataBase.js");
-const orderBase = require("./orderBase.js");
+
+const dataBase = DB.connect("users_hard_boost_bot");
+const orderBase = DB.connect("orders_service");
+
+
+// const dataBase = require("./dataBase.js");
+// const orderBase = require("./orderBase.js");
 
 const TOKEN_VEXBOOST= process.env.TOKEN_VEXBOOST; 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -55,16 +61,32 @@ setInterval(getNewService, (1000*60*60));
 
 
 
-// orderBase.find({ completed: false }).then((res) => { 
-//   console.log(res)
-// })
-
 function updateOrdersConnect(id) {
-  console.log('updateOrdersConnect');
-  orderBase.find({ customer: id, completed: false, ready:true }).then((res) => {
+  orderBase.find({ customer: id, completed: false }).toArray().then((res) => {
+    console.log('updateOrdersConnect: ', res.length);
     res.forEach((item) => {
       axios(`https://vexboost.ru/api/v2?action=status&order=${item.order}&key=${TOKEN_VEXBOOST}`).then((order) => {  
-        console.log(item);
+        const { status } = order.data;
+
+        if (status != "In progress" && status != "Awaiting") {
+          if (status == "Partial") {
+            const payBack = (item.price / item.amount) * order.data.remains * 1;
+            axios.post(`${URL_BOT}/send-user`, { id: item.customer, msg: `<b>🎉 Ваш заказ был выполнен частично #${item.id}</b> \n <blockquote><b>💸 Вам возвращено:</b> ${payBack.toFixed(2)}₽</blockquote>` }, { headers: { "Content-Type": "application/json" } });
+
+            dataBase.updateOne({ id: item.customer }, { $inc: { balance: payBack } } );
+            orderBase.updateOne({ id: item.id }, { $set: { completed: true, status: "Частично выполнен" } });
+          } else if (status == "Completed") {
+            axios.post(`${URL_BOT}/send-user`, {id: item.customer, msg:`<b>🎉 Ваш заказ был полностью выполнен #${item.id}</b>`}, {  headers: { 'Content-Type':'application/json' } })
+            orderBase.updateOne({ id: item.id }, { $set: { completed: true, status: "Завершен" } });
+          } else if (status == "Canceled") {
+            axios.post(`${URL_BOT}/send-user`,{ id: item.customer, msg: `<b>❌ Ваш заказ был отменен #${item.id}</b> \n <blockquote><b>💸 Вам возвращено:</b> ${item.price}₽</blockquote>` },
+              { headers: { "Content-Type": "application/json" } }
+            );
+
+            dataBase.updateOne({ id: item.customer }, { $inc: { balance: item.price } });
+            orderBase.updateOne({ id: item.id }, { $set: { completed: true, status: "Отменен" } });
+          }
+        }
       });
     });
   });
@@ -73,7 +95,7 @@ function updateOrdersConnect(id) {
 
 
 function updateOrders() {
-  orderBase.find({ completed: false }).then((res) => {
+  orderBase.find({ completed: false }).toArray().then((res) => {
     res.forEach((item) => {
 
       axios(`https://vexboost.ru/api/v2?action=status&order=${item.order}&key=${TOKEN_VEXBOOST}`).then((order) => {
@@ -102,7 +124,7 @@ function updateOrders() {
     });
   });
 }
-updateOrders()
+//updateOrders()
 setInterval(() => {
   updateOrders();
 }, 1000*60*5);
@@ -138,9 +160,7 @@ app.post("/pay", async (req, res) => {
   res.send({ message: "Hello World" });
 });
 
-app.get("/sleep", async (req, res) => {
-  res.send({ type: 200 });
-});
+
 
 
 app.post('/api/auth', async (req, res) => {
@@ -182,8 +202,8 @@ app.post('/api/my-orders', async (req, res) => {
 
   if(answer.isVerify){
     const { id } = answer.user;
-    orderBase.find({ customer: id }).then(orders => {
-      //updateOrdersConnect(id);
+    orderBase.find({ customer: id }).toArray().then(orders => {
+      updateOrdersConnect(id);
       res.send({ orders, services});
     });
   }
@@ -210,7 +230,7 @@ app.post('/api/create-order', async (req, res) => {
     dataBase.findOne({ id }).then(user => {
       if(user){
         const currentService = services.filter((item) => item.service === service)[0];
-        const currentPay = (currentService.rate/type.amount)*amount;
+        const currentPay = ((currentService.rate/type.amount)*amount)*KF;
  
         if (currentPay <= user.balance && currentService.min <= amount && currentService.max >= amount) {  
           axios(`https://vexboost.ru/api/v2?action=add&service=${service}&link=${url}&quantity=${amount}&key=${TOKEN_VEXBOOST}`).then(order => { 
@@ -228,7 +248,8 @@ app.post('/api/create-order', async (req, res) => {
               date: dateNow()
             });
           });
-          res.send({ type: 'create', msg: 'Успешно создан'});
+
+          res.send({ type: 'create', msg: 'Успешно создан' });
         }
         else{
           res.send({ type: 'rmv', msg: 'Непрошли проверку'});
@@ -251,18 +272,20 @@ app.post('/api/create-order', async (req, res) => {
 
 
 app.get('/all-users', async (req, res) => {
-  dataBase.find({ }).then((res_1) => {
+  dataBase.find({ }).toArray().then((res_1) => {
     res.send(res_1)
   });
 });
 
 app.get('/all-orders', async (req, res) => {
-  orderBase.find({ }).then((res_1) => {
+  orderBase.find({ }).toArray().then((res_1) => {
     res.send(res_1)
   });
 });
 
-
+app.get("/sleep", async (req, res) => {
+  res.send({ type: 200 });
+});
 
 
 
