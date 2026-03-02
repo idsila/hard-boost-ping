@@ -4,6 +4,7 @@ const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 const app = express();
+const fs = require("fs");
 
 const dataBase = require("./dataBase.js");
 const orderBase = require("./orderBase.js");
@@ -27,15 +28,18 @@ let followers, views, reactions, boosts, stars, referrals = [];
  
 function getNewService(){
   axios(`https://vexboost.ru/api/v2?action=services&key=${TOKEN_VEXBOOST}`).then(res => {
-    services = res.data;
+    
+
+    //fs.writeFileSync("services.json", JSON.stringify(res.data, null, 2));
     obj = JSON.parse(JSON.stringify(res.data).replaceAll('vexboost', 'hardboost').replaceAll('VexBoost', 'HardBoost').replaceAll('.ru', '.vercel.app'));
 
     obj.forEach(item => item.rate = item.rate*KF);
+    services = res.data;
     followers = obj.filter((item) => item.name.includes("одписчик") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
     views = obj.filter((item) => item.name.includes("росмотр") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
     reactions = obj.filter( (item) => item.name.includes("еакци") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
     boosts = obj.filter((item) => item.name.includes("Telegram Буст") && item.network === "Telegram").sort((a,b) => a.rate - b.rate);
-    stars = obj.filter((item) => item.name.includes("Telegram Stars")).sort((a,b) => a.rate - b.rate);
+    stars = obj.filter((item) => item.name.includes("Telegram Звезды")).sort((a,b) => a.rate - b.rate);
     referrals = obj.filter((item) => (item.category.includes("Старты бота") || item.category.includes("Рефералы"))).sort((a,b) => a.rate - b.rate);  
 
     all_services = { followers, views, reactions, boosts, stars, referrals } ;
@@ -44,8 +48,7 @@ function getNewService(){
 
 
 getNewService();
-
-setInterval(getNewService,(1000*60*60)*60 );
+setInterval(getNewService, (1000*60*60));
 
 
 
@@ -70,62 +73,39 @@ function updateOrdersConnect(id) {
 
 
 function updateOrders() {
-  orderBase.find({ completed: false, ready:true }).then((res) => {
+  orderBase.find({ completed: false }).then((res) => {
     res.forEach((item) => {
-      // https://vexboost.ru/api/v2?action=services&key=${TOKEN_VEXBOOST}
-      // https://optsmm.ru/api/v2?action=status&order=${item.order}&key=${OPTSMM_KEY}
-      axios(
-        `https://vexboost.ru/api/v2?action=status&order=${item.order}&key=${TOKEN_VEXBOOST}`
-      ).then((order) => {
+
+      axios(`https://vexboost.ru/api/v2?action=status&order=${item.order}&key=${TOKEN_VEXBOOST}`).then((order) => {
         const { status } = order.data;
+
         if (status != "In progress" && status != "Awaiting") {
           if (status == "Partial") {
             const payBack = (item.price / item.amount) * order.data.remains * 1;
-            axios.post(
-              `${URL_BOT}/send-user`,
-              {
-                id: item.customer,
-                msg: `<b>🎉 Ваш заказ был выполнен частично #${item.id}</b>
-<blockquote><b>💸 Вам возвращено:</b> ${payBack.toFixed(2)}₽</blockquote>`,
-              },
-              { headers: { "Content-Type": "application/json" } }
-            );
+            axios.post(`${URL_BOT}/send-user`, { id: item.customer, msg: `<b>🎉 Ваш заказ был выполнен частично #${item.id}</b> \n <blockquote><b>💸 Вам возвращено:</b> ${payBack.toFixed(2)}₽</blockquote>` }, { headers: { "Content-Type": "application/json" } });
 
-            dataBase.updateOne(
-              { id: item.customer },
-              { $inc: { balance: payBack } }
-            );
-            orderBase.updateOne({ id: item.id }, { $set: { completed: true } });
+            dataBase.updateOne({ id: item.customer }, { $inc: { balance: payBack } } );
+            orderBase.updateOne({ id: item.id }, { $set: { completed: true, status: "Частично выполнен" } });
           } else if (status == "Completed") {
             axios.post(`${URL_BOT}/send-user`, {id: item.customer, msg:`<b>🎉 Ваш заказ был полностью выполнен #${item.id}</b>`}, {  headers: { 'Content-Type':'application/json' } })
-            orderBase.updateOne({ id: item.id }, { $set: { completed: true } });
+            orderBase.updateOne({ id: item.id }, { $set: { completed: true, status: "Завершен" } });
           } else if (status == "Canceled") {
-            axios.post(
-              `${URL_BOT}/send-user`,
-              {
-                id: item.customer,
-                msg: `<b>❌ Ваш заказ был отменен #${item.id}</b>
-<blockquote><b>💸 Вам возвращено:</b> ${item.price}₽</blockquote>
-    `,
-              },
+            axios.post(`${URL_BOT}/send-user`,{ id: item.customer, msg: `<b>❌ Ваш заказ был отменен #${item.id}</b> \n <blockquote><b>💸 Вам возвращено:</b> ${item.price}₽</blockquote>` },
               { headers: { "Content-Type": "application/json" } }
             );
 
-            dataBase.updateOne(
-              { id: item.customer },
-              { $inc: { balance: item.price } }
-            );
-            orderBase.updateOne({ id: item.id }, { $set: { completed: true } });
+            dataBase.updateOne({ id: item.customer }, { $inc: { balance: item.price } });
+            orderBase.updateOne({ id: item.id }, { $set: { completed: true, status: "Отменен" } });
           }
         }
       });
     });
   });
 }
-//updateOrders()
+updateOrders()
 setInterval(() => {
-  //updateOrders();
-}, 1000*60*10);
+  updateOrders();
+}, 1000*60*5);
 
 
 app.post("/pay", async (req, res) => {
@@ -203,7 +183,7 @@ app.post('/api/my-orders', async (req, res) => {
   if(answer.isVerify){
     const { id } = answer.user;
     orderBase.find({ customer: id }).then(orders => {
-      updateOrdersConnect(id);
+      //updateOrdersConnect(id);
       res.send({ orders, services});
     });
   }
@@ -222,7 +202,7 @@ app.post('/api/create-order', async (req, res) => {
 
   const type = typeOrder(service);
 
-    console.log(type, service);
+  // console.log(type, service);
 
 
   if(answer.isVerify){
@@ -242,7 +222,7 @@ app.post('/api/create-order', async (req, res) => {
               amount: amount,
               price: currentPay,
               url: url,
-              ready: true,
+              status: 'В процессе',
               completed: false,
               order: order.data.order,
               date: dateNow()
@@ -282,32 +262,6 @@ app.get('/all-orders', async (req, res) => {
   });
 });
 
-
-
-
-// app.post('/followers', async (req, res) => {
-//   res.send(followers);
-// });
-
-// app.post('/views', async (req, res) => {
-//   res.send(views);
-// });
-
-// app.post('/reactions', async (req, res) => {
-//   res.send(reactions);
-// });
-
-// app.post('/boosts', async (req, res) => {
-//   res.send(boosts);
-// });
-
-// app.post('/stars', async (req, res) => {
-//   res.send(stars);
-// });
-
-// app.post('/referrals', async (req, res) => {
-//   res.send(referrals);
-// });
 
 
 

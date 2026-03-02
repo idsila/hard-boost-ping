@@ -88,7 +88,7 @@ async function updateOne(params = {}, set = {}) {
 
 
 
-async function finde(params = {}) {
+async function find(params = {}) {
   try {
     const db = await client.db("test");
     const users = await db.collection("users");
